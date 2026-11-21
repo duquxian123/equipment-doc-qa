@@ -15,6 +15,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_SAMPLES_DIR = ROOT / "corpus"
+OFFLINE_SAMPLE_NAME = "CI_设备维护规范.pdf"
 
 
 @dataclass(frozen=True)
@@ -103,6 +104,59 @@ def ensure_sample(sample: Sample, directory: Path) -> str:
             temporary_path.unlink()
 
 
+def ensure_offline_sample(directory: Path) -> str:
+    """Generate a deterministic PDF so CI does not depend on third-party sites."""
+    target = directory / OFFLINE_SAMPLE_NAME
+    if target.exists():
+        return f"skip {OFFLINE_SAMPLE_NAME}"
+
+    import pymupdf
+
+    directory.mkdir(parents=True, exist_ok=True)
+    document = pymupdf.open()
+    try:
+        document.set_metadata(
+            {
+                "title": "设备维护规范（CI 离线样例）",
+                "author": "equipment-doc-qa",
+                "subject": "自动化测试用合成样例，不对应真实设备手册",
+            }
+        )
+        page = document.new_page()
+        page.insert_textbox(
+            pymupdf.Rect(50, 50, 545, 790),
+            (
+                "设备维护规范\n\n"
+                "第1章 总则\n"
+                "本规范用于验证设备文档检索、引用页码和问答流程。\n\n"
+                "第2章 保养周期\n"
+                "一级保养每月执行一次。二级保养每季度执行一次。\n"
+                "维护前必须停机并切断能源，完成安全确认后才能作业。\n"
+            ),
+            fontname="china-s",
+            fontsize=14,
+            lineheight=1.5,
+        )
+        page = document.new_page()
+        page.insert_textbox(
+            pymupdf.Rect(50, 50, 545, 790),
+            (
+                "第3章 故障处理\n"
+                "发现异常振动时立即停机，检查紧固件并记录处理结果。\n"
+                "维修完成后进行空载试运行，确认无异常再恢复生产。\n\n"
+                "第4章 记录管理\n"
+                "保养记录应包含日期、执行人、检查结果和后续措施。\n"
+            ),
+            fontname="china-s",
+            fontsize=14,
+            lineheight=1.5,
+        )
+        document.save(target, garbage=3, deflate=True)
+    finally:
+        document.close()
+    return f"generate {OFFLINE_SAMPLE_NAME}"
+
+
 def run_build_step(script: str) -> None:
     subprocess.run(
         [sys.executable, str(ROOT / "src" / script)],
@@ -126,6 +180,11 @@ def parse_args() -> argparse.Namespace:
         default=DEFAULT_SAMPLES_DIR,
         help="样例 PDF 保存目录，默认使用项目的 corpus/。",
     )
+    parser.add_argument(
+        "--offline",
+        action="store_true",
+        help="生成 CI 离线样例，不访问第三方 PDF 网站。",
+    )
     return parser.parse_args()
 
 
@@ -136,8 +195,11 @@ def main() -> int:
         raise SystemExit("自定义 --samples-dir 仅可与 --samples-only 一起使用。")
 
     try:
-        for sample in SAMPLES:
-            print(ensure_sample(sample, samples_dir), flush=True)
+        if args.offline or os.environ.get("GITHUB_ACTIONS") == "true":
+            print(ensure_offline_sample(samples_dir), flush=True)
+        else:
+            for sample in SAMPLES:
+                print(ensure_sample(sample, samples_dir), flush=True)
     except Exception as exc:
         print(f"样例准备失败：{exc}", file=sys.stderr)
         return 1

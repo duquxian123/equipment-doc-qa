@@ -24,7 +24,8 @@ class VectorRetriever:
         meta = json.loads((INDEX / "index_meta.json").read_text(encoding="utf-8"))
         self.model_name = meta["model"]
         self.vectors = np.load(INDEX / "vectors.npy")
-        self.docs = [json.loads(line) for line in CHUNKS.open(encoding="utf-8")]
+        with CHUNKS.open(encoding="utf-8") as chunks_file:
+            self.docs = [json.loads(line) for line in chunks_file]
 
         ids = [d["id"] for d in self.docs]
         if ids != meta["ids"]:

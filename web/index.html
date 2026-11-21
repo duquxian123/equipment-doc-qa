@@ -1,0 +1,638 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="设备文档问答、原文引用与 PDF 入库工作台">
+  <title>问答工作台 · 设备文档助手</title>
+  <link rel="stylesheet" href="/static/styles.css">
+  <link rel="stylesheet" href="/static/ops.css">
+</head>
+<body>
+  <section class="auth-gate" id="auth-gate" aria-labelledby="auth-title">
+    <form class="auth-card" id="auth-form">
+      <div class="auth-brand">
+        <span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span>
+        <span>
+          <strong>设备知识中枢</strong>
+          <small>EQUIPMENT DOCUMENT QA</small>
+        </span>
+      </div>
+      <div class="auth-copy">
+        <span class="section-kicker" id="auth-kicker">本地安全入口</span>
+        <h1 id="auth-title">登录工作台</h1>
+        <p id="auth-description">使用本地账号进入设备文档问答与知识库管理。</p>
+      </div>
+      <label class="auth-field">
+        <span>用户名</span>
+        <input id="auth-username" name="username" autocomplete="username" minlength="3" maxlength="32" required>
+      </label>
+      <label class="auth-field">
+        <span>密码</span>
+        <input id="auth-password" name="password" type="password" autocomplete="current-password" minlength="8" maxlength="128" required>
+      </label>
+      <label class="auth-field" id="auth-confirm-field" hidden>
+        <span>确认密码</span>
+        <input id="auth-confirm-password" type="password" autocomplete="new-password" minlength="8" maxlength="128">
+      </label>
+      <p class="auth-error" id="auth-error" role="alert" hidden></p>
+      <button class="auth-submit" id="auth-submit" type="submit">登录</button>
+      <p class="auth-note" id="auth-note">首次启动时会引导创建第一个系统管理员。</p>
+    </form>
+  </section>
+
+  <div class="app-shell" id="app-shell" hidden>
+    <aside class="sidebar" aria-label="主导航">
+      <a class="brand" href="#/chat" aria-label="返回问答工作台">
+        <span class="brand-mark" aria-hidden="true">
+          <span></span><span></span><span></span>
+        </span>
+        <span class="brand-copy">
+          <strong>设备知识中枢</strong>
+          <small>DOCUMENT QA</small>
+        </span>
+      </a>
+
+      <nav class="nav-groups">
+        <div class="nav-group">
+          <div class="nav-label">工作台</div>
+          <button class="nav-item is-active" type="button" data-route="chat" data-permission="chat.use" aria-current="page">
+            <span class="nav-icon nav-icon-chat" aria-hidden="true"></span>
+            <span>问答工作台</span>
+          </button>
+          <a class="nav-item" href="/agent" data-permission="chat.use">
+            <span class="nav-icon nav-icon-agent" aria-hidden="true"></span>
+            <span>智能体工作台</span>
+          </a>
+          <button class="nav-item" type="button" data-route="ops" data-permission="ops.view">
+            <span class="nav-icon nav-icon-ops" aria-hidden="true"></span>
+            <span>生产运营沙盘</span>
+          </button>
+        </div>
+
+        <div class="nav-group">
+          <div class="nav-label">知识库</div>
+          <button class="nav-item" type="button" data-route="documents" data-permission="documents.manage">
+            <span class="nav-icon nav-icon-doc" aria-hidden="true"></span>
+            <span>文档入库</span>
+          </button>
+          <button class="nav-item is-disabled" type="button" disabled>
+            <span class="nav-icon nav-icon-slice" aria-hidden="true"></span>
+            <span>切片管理</span>
+            <span class="later-tag">后续</span>
+          </button>
+          <button class="nav-item" type="button" data-route="versions" data-permission="versions.manage">
+            <span class="nav-icon nav-icon-version" aria-hidden="true"></span>
+            <span>版本管理</span>
+          </button>
+        </div>
+
+        <div class="nav-group">
+          <div class="nav-label">系统管理</div>
+          <button class="nav-item" type="button" data-route="users" data-permission="users.manage">
+            <span class="nav-icon nav-icon-user" aria-hidden="true"></span>
+            <span>用户与角色</span>
+          </button>
+          <button class="nav-item" type="button" data-route="permissions" data-permission="users.manage">
+            <span class="nav-icon nav-icon-lock" aria-hidden="true"></span>
+            <span>权限配置</span>
+          </button>
+          <button class="nav-item" type="button" data-route="audit" data-permission="audit.view">
+            <span class="nav-icon nav-icon-log" aria-hidden="true"></span>
+            <span>操作日志</span>
+          </button>
+        </div>
+      </nav>
+
+      <div class="sidebar-user">
+        <span class="user-avatar" id="sidebar-user-avatar" aria-hidden="true">管</span>
+        <span class="user-copy">
+          <strong id="sidebar-user-name">正在载入</strong>
+          <small id="sidebar-user-role">权限读取中</small>
+        </span>
+        <button class="user-menu" id="logout-button" type="button" aria-label="退出登录">退出</button>
+      </div>
+    </aside>
+
+    <div class="workspace">
+      <header class="topbar">
+        <div class="breadcrumbs" aria-label="面包屑">
+          <span>设备知识中枢</span>
+          <span class="crumb-separator">/</span>
+          <span id="current-page-label">问答工作台</span>
+        </div>
+        <div class="topbar-actions">
+          <span class="service-state is-loading" id="service-state" title="正在检查服务状态">
+            <span class="state-dot" aria-hidden="true"></span>
+            <span id="service-state-text">正在检查</span>
+          </span>
+          <button class="icon-button" type="button" id="refresh-button" aria-label="刷新当前页面">
+            <span aria-hidden="true">↻</span>
+          </button>
+          <span class="user-avatar topbar-avatar" id="topbar-user-avatar" aria-hidden="true">管</span>
+        </div>
+      </header>
+
+      <main class="content">
+        <section class="page is-active" id="page-chat" aria-labelledby="chat-title">
+          <div class="page-heading">
+            <div>
+              <h1 id="chat-title">问答工作台</h1>
+              <p>向设备文档提问，答案会附带可核验的原文出处。</p>
+            </div>
+            <span class="heading-badge" id="document-ready-badge">
+              <span class="state-dot" aria-hidden="true"></span>
+              <span>正在载入文档</span>
+            </span>
+          </div>
+
+          <div class="chat-panel">
+            <div class="chat-thread" id="chat-thread" aria-live="polite">
+              <article class="message assistant-message welcome-message">
+                <div class="message-avatar" aria-hidden="true">
+                  <span class="mini-doc"></span>
+                </div>
+                <div class="message-body">
+                  <div class="message-author">设备文档助手</div>
+                  <div class="message-bubble">
+                    <p>你好，我是设备文档助手。可以问我设备参数、维护保养和故障处理，答案会附上可核验的原文出处。</p>
+                  </div>
+                </div>
+              </article>
+            </div>
+
+            <div class="composer-wrap">
+              <div class="sample-questions" aria-label="示例问题">
+                <span>试试这样问</span>
+                <button type="button" data-question="二级保养多久做一次？">二级保养多久做一次？</button>
+                <button type="button" data-question="机器坏了怎么修？">机器坏了怎么修？</button>
+                <button type="button" data-question="灭火剂的保质期是几年？">无答案拒答</button>
+              </div>
+
+              <form class="composer" id="question-form">
+                <label class="sr-only" for="question-input">输入设备文档问题</label>
+                <textarea
+                  id="question-input"
+                  rows="1"
+                  maxlength="2000"
+                  placeholder="继续提问，例如：日常点检记录由谁负责？"
+                  required
+                ></textarea>
+                <button class="send-button" id="send-button" type="submit" aria-label="发送问题">
+                  <span aria-hidden="true">↑</span>
+                </button>
+              </form>
+              <p class="composer-note">答案只依据已上传设备文档生成；资料不足时会明确拒答。</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="page" id="page-documents" aria-labelledby="documents-title" hidden>
+          <div class="page-heading">
+            <div>
+              <h1 id="documents-title">文档入库</h1>
+              <p>上传设备 PDF 后先生成审核草稿，确认清洗和切片结果后再发布到问答。</p>
+            </div>
+            <span class="heading-badge role-badge">知识管理员</span>
+          </div>
+
+          <div class="documents-grid">
+            <section class="upload-card">
+              <input id="file-input" class="sr-only" type="file" accept=".pdf,application/pdf">
+              <button class="upload-dropzone" id="upload-dropzone" type="button">
+                <span class="upload-symbol" aria-hidden="true">↑</span>
+                <strong>拖拽 PDF 到此处，或选择本地文件</strong>
+                <small>仅支持 PDF · 单文件最大 50 MB</small>
+                <span class="upload-cta">选择 PDF 文件</span>
+              </button>
+
+              <div class="pipeline">
+                <div class="pipeline-heading">
+                  <span>上传后自动生成草稿</span>
+                  <span class="pipeline-hint">正式索引在发布前保持不变</span>
+                </div>
+                <ol class="pipeline-steps" id="pipeline-steps">
+                  <li data-stage="parsing"><span>1</span><strong>解析</strong><small>PDF → 页面</small></li>
+                  <li data-stage="cleaning"><span>2</span><strong>清洗</strong><small>去除页眉</small></li>
+                  <li data-stage="chunking"><span>3</span><strong>切片</strong><small>章节 / 表格</small></li>
+                  <li data-stage="review"><span>4</span><strong>审核</strong><small>清洗 / 切片</small></li>
+                  <li data-stage="publishing"><span>5</span><strong>发布</strong><small>切换正式索引</small></li>
+                </ol>
+              </div>
+
+              <div class="job-panel" id="job-panel" hidden aria-live="polite">
+                <div class="job-heading">
+                  <div>
+                    <strong id="job-title">正在处理文档</strong>
+                    <p id="job-message">文件已上传，等待处理</p>
+                  </div>
+                  <span class="job-percent" id="job-percent">0%</span>
+                </div>
+                <div class="progress-track" role="progressbar" aria-label="文档处理进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+                  <span class="progress-fill" id="job-progress"></span>
+                </div>
+              </div>
+            </section>
+
+            <section class="review-card" id="review-card" hidden aria-labelledby="review-title">
+              <div class="review-heading">
+                <div>
+                  <span class="section-kicker">待审核草稿</span>
+                  <h2 id="review-title">入库审核</h2>
+                  <p id="review-document-name">等待生成审核结果</p>
+                </div>
+                <div class="review-heading-actions">
+                  <span class="status-pill is-pending" id="review-status-pill">处理中</span>
+                  <button class="text-button" id="reparse-button" type="button">重新解析</button>
+                </div>
+              </div>
+
+              <div class="review-tabs" role="tablist" aria-label="入库审核步骤">
+                <button
+                  class="review-tab is-active"
+                  type="button"
+                  role="tab"
+                  aria-selected="true"
+                  data-review-tab="cleaning"
+                  aria-controls="review-cleaning"
+                >
+                  清洗结果
+                  <span id="clean-count-badge">0</span>
+                </button>
+                <button
+                  class="review-tab"
+                  type="button"
+                  role="tab"
+                  aria-selected="false"
+                  data-review-tab="chunks"
+                  aria-controls="review-chunks"
+                >
+                  切片结果
+                  <span id="chunk-count-badge">0</span>
+                </button>
+              </div>
+
+              <div class="review-panel" id="review-cleaning" role="tabpanel">
+                <div class="review-toolbar">
+                  <label class="compact-field">
+                    <span>清洗预设</span>
+                    <select id="clean-preset">
+                      <option value="conservative">保守清洗</option>
+                      <option value="standard" selected>标准清洗</option>
+                      <option value="aggressive">激进清洗</option>
+                    </select>
+                  </label>
+                  <button class="primary-button" id="apply-clean-button" type="button">应用清洗并重新切片</button>
+                </div>
+
+                <div class="clean-summary" id="clean-summary">
+                  正在读取清洗结果…
+                </div>
+
+                <div class="clean-browser">
+                  <div class="clean-browser-side">
+                    <label class="compact-field">
+                      <span>查看页面</span>
+                      <select id="clean-page-select"></select>
+                    </label>
+                    <label class="form-check">
+                      <input id="exclude-page-checkbox" type="checkbox">
+                      <span>整页排除</span>
+                    </label>
+                    <p>取消“保留”会把该行作为噪声排除；被自动删除的行可以重新勾选恢复。</p>
+                  </div>
+                  <div class="clean-lines" id="clean-lines" aria-live="polite"></div>
+                </div>
+              </div>
+
+              <div class="review-panel" id="review-chunks" role="tabpanel" hidden>
+                <div class="review-toolbar chunk-toolbar">
+                  <label class="compact-field">
+                    <span>切分预设</span>
+                    <select id="chunk-preset">
+                      <option value="short">短块高精度 · 300 / 20 / 600</option>
+                      <option value="standard" selected>标准平衡 · 400 / 40 / 800</option>
+                      <option value="long">长块保上下文 · 600 / 20 / 1200</option>
+                    </select>
+                  </label>
+                  <label class="form-check compact-check">
+                    <input id="split-by-page-checkbox" type="checkbox">
+                    <span>按页切分</span>
+                  </label>
+                  <button class="primary-button" id="rechunk-button" type="button">重新切分</button>
+                </div>
+                <div class="chunk-summary" id="chunk-summary">正在读取切片结果…</div>
+                <div class="chunk-list" id="chunk-list"></div>
+              </div>
+
+              <div class="review-footer">
+                <button class="danger-button" id="discard-draft-button" type="button">放弃本次入库</button>
+                <button class="primary-button publish-button" id="publish-draft-button" type="button">
+                  发布到问答
+                </button>
+              </div>
+            </section>
+
+            <section class="library-card">
+              <div class="library-heading">
+                <div>
+                  <h2>已入库文档</h2>
+                  <p id="document-totals">正在读取文档目录</p>
+                </div>
+                <button class="text-button" id="reload-documents" type="button">刷新列表</button>
+              </div>
+
+              <div class="document-table-wrap">
+                <table class="document-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">文档</th>
+                      <th scope="col">页数</th>
+                      <th scope="col">知识块</th>
+                      <th scope="col">状态</th>
+                      <th scope="col"><span class="sr-only">操作</span></th>
+                    </tr>
+                  </thead>
+                  <tbody id="document-list">
+                    <tr class="loading-row">
+                      <td colspan="5">正在载入文档目录…</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div class="index-summary" id="index-summary">
+                <span>索引状态读取中</span>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <section class="page" id="page-ops" aria-labelledby="ops-title" hidden>
+          <div class="page-heading">
+            <div>
+              <h1 id="ops-title">生产运营沙盘</h1>
+              <p>模拟 ERP 下单、MES 生产回报、成本结算和产线数据分析的完整闭环。</p>
+            </div>
+            <span class="heading-badge ops-demo-badge">模拟数据</span>
+          </div>
+
+          <div class="ops-demo-note">
+            <strong>演示边界</strong>
+            <span>订单、产线和生产数据均由程序生成，不连接真实 ERP/MES，也不代表真实企业工作经历。</span>
+            <span class="ops-refresh-time" id="ops-refresh-time">正在读取</span>
+          </div>
+
+          <div class="ops-kpis" id="ops-kpis" aria-live="polite">
+            <div class="ops-kpi is-loading">正在读取运营指标…</div>
+          </div>
+
+          <div class="ops-layout ops-layout-primary">
+            <section class="ops-card ops-orders-card">
+              <div class="ops-card-heading">
+                <div>
+                  <span class="section-kicker">ERP 订单队列</span>
+                  <h2>销售订单与生产状态</h2>
+                  <p id="ops-order-summary">正在读取订单</p>
+                </div>
+                <button class="text-button" id="ops-reload-button" type="button">刷新数据</button>
+              </div>
+              <div class="ops-table-wrap">
+                <table class="ops-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">订单</th>
+                      <th scope="col">客户 / 规格</th>
+                      <th scope="col">数量</th>
+                      <th scope="col">状态</th>
+                      <th scope="col">产线</th>
+                      <th scope="col">质检</th>
+                      <th scope="col"><span class="sr-only">操作</span></th>
+                    </tr>
+                  </thead>
+                  <tbody id="ops-order-list">
+                    <tr class="ops-loading-row"><td colspan="7">正在读取订单…</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <section class="ops-card ops-create-card" id="ops-create-card">
+              <div class="ops-card-heading">
+                <div>
+                  <span class="section-kicker">ERP</span>
+                  <h2>创建模拟订单</h2>
+                  <p>提交后进入待下发状态。</p>
+                </div>
+              </div>
+              <form class="ops-form" id="ops-create-form">
+                <label class="ops-field">
+                  <span>模拟客户</span>
+                  <input id="ops-customer" maxlength="80" value="模拟客户·本地加工中心" required>
+                </label>
+                <div class="ops-form-row">
+                  <label class="ops-field">
+                    <span>合金</span>
+                    <select id="ops-alloy">
+                      <option value="5052">5052</option>
+                      <option value="3003">3003</option>
+                      <option value="1060">1060</option>
+                    </select>
+                  </label>
+                  <label class="ops-field">
+                    <span>厚度 mm</span>
+                    <input id="ops-thickness" type="number" min="0.05" max="10" step="0.01" value="0.50" required>
+                  </label>
+                </div>
+                <div class="ops-form-row">
+                  <label class="ops-field">
+                    <span>数量 吨</span>
+                    <input id="ops-quantity" type="number" min="0.1" max="200" step="0.1" value="20" required>
+                  </label>
+                  <label class="ops-field">
+                    <span>交期</span>
+                    <input id="ops-due-date" type="date" required>
+                  </label>
+                </div>
+                <label class="ops-field">
+                  <span>优先级</span>
+                  <select id="ops-priority">
+                    <option value="normal">普通</option>
+                    <option value="rush">加急</option>
+                  </select>
+                </label>
+                <button class="primary-button ops-submit" type="submit">创建订单</button>
+              </form>
+              <p class="ops-permission-note" id="ops-create-permission-note" hidden>当前角色只能查看，不能创建或下发订单。</p>
+            </section>
+          </div>
+
+          <section class="ops-card ops-detail-card" id="ops-detail-card">
+            <div class="ops-detail-empty" id="ops-detail-empty">
+              <span class="ops-flow-mark" aria-hidden="true">ERP → MES → ERP</span>
+              <strong>选择一笔订单查看业务闭环</strong>
+              <p>待下发订单可以生成 MES 工单；已下发工单可以提交产量和质检数据。</p>
+            </div>
+            <div id="ops-detail-content" hidden></div>
+          </section>
+
+          <div class="ops-layout ops-analysis-layout">
+            <section class="ops-card">
+              <div class="ops-card-heading">
+                <div>
+                  <span class="section-kicker">产线与成本</span>
+                  <h2>运营分析</h2>
+                  <p>按模拟历史数据聚合，不包含真实企业信息。</p>
+                </div>
+              </div>
+              <div class="ops-line-list" id="ops-line-list"></div>
+              <div class="ops-trend" id="ops-trend"></div>
+            </section>
+
+            <section class="ops-card">
+              <div class="ops-card-heading">
+                <div>
+                  <span class="section-kicker">质量分析</span>
+                  <h2>缺陷分布</h2>
+                  <p>从这里可以带着异常问题进入设备文档问答。</p>
+                </div>
+              </div>
+              <div class="ops-defect-list" id="ops-defect-list"></div>
+              <button class="text-button ops-sop-button" id="ops-open-sop" type="button">
+                查询厚度超差处理规范
+              </button>
+            </section>
+          </div>
+        </section>
+
+        <section class="page" id="page-versions" aria-labelledby="versions-title" hidden>
+          <div class="page-heading">
+            <div>
+              <h1 id="versions-title">索引版本</h1>
+              <p>查看已发布的问答索引快照，并在需要时回滚。</p>
+            </div>
+            <span class="heading-badge role-badge">版本管理员</span>
+          </div>
+          <section class="admin-card">
+            <div class="admin-card-heading">
+              <div>
+                <h2>版本历史</h2>
+                <p id="versions-summary">正在读取版本列表</p>
+              </div>
+              <button class="text-button" id="reload-versions" type="button">刷新</button>
+            </div>
+            <div class="version-list" id="version-list">
+              <p class="admin-empty">正在读取版本列表…</p>
+            </div>
+          </section>
+        </section>
+
+        <section class="page" id="page-users" aria-labelledby="users-title" hidden>
+          <div class="page-heading">
+            <div>
+              <h1 id="users-title">用户与角色</h1>
+              <p>管理本地账号、角色和启用状态。</p>
+            </div>
+            <span class="heading-badge role-badge">系统管理员</span>
+          </div>
+          <div class="admin-grid">
+            <section class="admin-card">
+              <div class="admin-card-heading">
+                <div>
+                  <h2>新增用户</h2>
+                  <p>新用户创建后即可使用分配的角色权限。</p>
+                </div>
+              </div>
+              <form class="inline-admin-form" id="create-user-form">
+                <label class="auth-field">
+                  <span>用户名</span>
+                  <input id="new-user-name" minlength="3" maxlength="32" required>
+                </label>
+                <label class="auth-field">
+                  <span>初始密码</span>
+                  <input id="new-user-password" type="password" autocomplete="new-password" minlength="8" maxlength="128" required>
+                </label>
+                <label class="compact-field">
+                  <span>角色</span>
+                  <select id="new-user-role">
+                    <option value="user">普通用户</option>
+                    <option value="knowledge_admin">知识管理员</option>
+                    <option value="system_admin">系统管理员</option>
+                  </select>
+                </label>
+                <button class="primary-button" type="submit">创建用户</button>
+              </form>
+            </section>
+            <section class="admin-card">
+              <div class="admin-card-heading">
+                <div>
+                  <h2>用户列表</h2>
+                  <p id="users-summary">正在读取用户</p>
+                </div>
+                <button class="text-button" id="reload-users" type="button">刷新</button>
+              </div>
+              <div class="admin-table-wrap">
+                <table class="admin-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">用户</th>
+                      <th scope="col">角色</th>
+                      <th scope="col">状态</th>
+                      <th scope="col">最近登录</th>
+                      <th scope="col">操作</th>
+                    </tr>
+                  </thead>
+                  <tbody id="user-list"></tbody>
+                </table>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <section class="page" id="page-permissions" aria-labelledby="permissions-title" hidden>
+          <div class="page-heading">
+            <div>
+              <h1 id="permissions-title">权限配置</h1>
+              <p>当前版本使用固定角色权限模板，角色分配在用户页面完成。</p>
+            </div>
+            <span class="heading-badge role-badge">只读矩阵</span>
+          </div>
+          <section class="admin-card">
+            <div class="admin-card-heading">
+              <div>
+                <h2>角色权限矩阵</h2>
+                <p>后端接口会再次校验这些权限，不能只靠隐藏菜单控制。</p>
+              </div>
+            </div>
+            <div class="permission-matrix" id="permission-matrix"></div>
+          </section>
+        </section>
+
+        <section class="page" id="page-audit" aria-labelledby="audit-title" hidden>
+          <div class="page-heading">
+            <div>
+              <h1 id="audit-title">操作日志</h1>
+              <p>查看登录、文档入库、索引发布和用户管理操作。</p>
+            </div>
+            <span class="heading-badge role-badge">仅系统管理员</span>
+          </div>
+          <section class="admin-card">
+            <div class="admin-card-heading">
+              <div>
+                <h2>最近操作</h2>
+                <p id="audit-summary">正在读取日志</p>
+              </div>
+              <button class="text-button" id="reload-audit" type="button">刷新</button>
+            </div>
+            <div class="audit-list" id="audit-list"></div>
+          </section>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+  <script src="/static/app.js" defer></script>
+  <script src="/static/ops.js" defer></script>
+</body>
+</html>

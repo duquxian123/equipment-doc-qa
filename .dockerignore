@@ -1,0 +1,12 @@
+.git
+.gitignore
+.venv
+.cache
+__pycache__
+*.pyc
+*.log
+.vscode
+tests
+output
+corpus
+docs/screenshots

@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import re
+from dataclasses import dataclass
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -34,6 +35,14 @@ HEAD_RE = re.compile(r"^(#{1,6})\s+(.*)$")
 LIST_HEAD_RE = re.compile(r"^[-*]\s*(\d+(?:\.\d+)*)\s+(\S.*)$")
 STD_NO_RE = re.compile(r"^[A-Z]{1,6}(/[A-Z]+)?\s*\S*\d")
 MAX_TITLE = 20
+
+
+@dataclass(frozen=True)
+class ChunkOptions:
+    max_chars: int = MAX_CHARS
+    min_chars: int = MIN_CHARS
+    table_max_chars: int = TABLE_MAX_CHARS
+    split_by_page: bool = False
 
 
 def plain(text: str) -> str:
@@ -101,10 +110,17 @@ def split_pages(md: str) -> list[tuple[int, list[str]]]:
     return pages
 
 
-def split_table(rows: list[str], caption: str, section: str, page_from: int, page_to: int) -> list[str]:
+def split_table(
+    rows: list[str],
+    caption: str,
+    section: str,
+    page_from: int,
+    page_to: int,
+    options: ChunkOptions,
+) -> list[str]:
     """超长表格按行拆开，每段都重复表头和表名。"""
     text = "\n".join(rows)
-    if len(text) <= TABLE_MAX_CHARS or len(rows) <= 2:
+    if len(text) <= options.table_max_chars or len(rows) <= 2:
         return [text]
 
     head = rows[:2]  # 表头 + 分隔线
@@ -113,7 +129,7 @@ def split_table(rows: list[str], caption: str, section: str, page_from: int, pag
     buf: list[str] = []
     for row in body:
         buf.append(row)
-        if len("\n".join(head + buf)) >= MAX_CHARS:
+        if len("\n".join(head + buf)) >= options.max_chars:
             parts.append("\n".join(head + buf))
             buf = []
     if buf:
@@ -122,8 +138,9 @@ def split_table(rows: list[str], caption: str, section: str, page_from: int, pag
     return parts
 
 
-def chunk_doc(path: Path) -> list[dict]:
+def chunk_doc(path: Path, options: ChunkOptions | None = None) -> list[dict]:
     doc = path.stem
+    options = options or ChunkOptions()
     pages = split_pages(path.read_text(encoding="utf-8"))
 
     chunks: list[dict] = []
@@ -150,12 +167,15 @@ def chunk_doc(path: Path) -> list[dict]:
                 "page_from": page_from,
                 "page_to": page_to if page_to is not None else page_from,
                 "kind": kind,
+                "body": text,
                 "text": text,
             }
         )
         buf, buf_len, page_from, page_to = [], 0, None, None
 
     for page_no, lines in pages:
+        if options.split_by_page and buf:
+            flush()
         i = 0
         while i < len(lines):
             raw = lines[i]
@@ -207,7 +227,7 @@ def chunk_doc(path: Path) -> list[dict]:
                                 caption = prev
                             break
 
-                parts = split_table(rows, caption, section(), page_no, page_no)
+                parts = split_table(rows, caption, section(), page_no, page_no, options)
                 for part in parts:
                     page_from = page_to = page_no
                     body = f"{caption}\n{part}".strip() if caption else part
@@ -215,7 +235,7 @@ def chunk_doc(path: Path) -> list[dict]:
                 continue
 
             # 3. 普通正文：够长了就先断开
-            if buf_len and buf_len + len(norm) > MAX_CHARS:
+            if buf_len and buf_len + len(norm) > options.max_chars:
                 flush()
             if page_from is None:
                 page_from = page_no
@@ -228,17 +248,27 @@ def chunk_doc(path: Path) -> list[dict]:
     return chunks
 
 
-def main() -> None:
+def build_all(
+    *,
+    verbose: bool = True,
+    options: ChunkOptions | None = None,
+) -> tuple[list[dict], list[dict]]:
+    """重建全部清洗文档的知识块，供命令行和上传任务共用。"""
+    options = options or ChunkOptions()
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     files = sorted(IN_DIR.glob("*.md"))
     if not files:
-        raise SystemExit(f"没有输入：{IN_DIR}（先跑 clean_md.py）")
+        raise RuntimeError(f"没有输入：{IN_DIR}（先跑 clean_md.py）")
 
     all_chunks: list[dict] = []
     dropped_all: list[dict] = []
     for path in files:
-        raw_chunks = chunk_doc(path)
-        chunks = [c for c in raw_chunks if c["kind"] == "table" or len(c["text"]) >= MIN_CHARS]
+        raw_chunks = chunk_doc(path, options)
+        chunks = [
+            c
+            for c in raw_chunks
+            if c["kind"] == "table" or len(c["body"]) >= options.min_chars
+        ]
         dropped = [c for c in raw_chunks if c not in chunks]
         dropped_all.extend(dropped)
         for idx, c in enumerate(chunks, start=1):
@@ -264,11 +294,12 @@ def main() -> None:
         )
 
         sizes = [c["chars"] for c in chunks]
-        print(
-            f"{path.stem}\n"
-            f"    块数 {len(chunks):>3}  弃 {len(dropped):>2}  平均 {sum(sizes) // len(sizes):>3} 字  "
-            f"最大 {max(sizes):>3} 字  表格块 {sum(1 for c in chunks if c['kind'] == 'table'):>2}"
-        )
+        if verbose:
+            print(
+                f"{path.stem}\n"
+                f"    块数 {len(chunks):>3}  弃 {len(dropped):>2}  平均 {sum(sizes) // len(sizes):>3} 字  "
+                f"最大 {max(sizes):>3} 字  表格块 {sum(1 for c in chunks if c['kind'] == 'table'):>2}"
+            )
 
     with (OUT_DIR / "chunks.jsonl").open("w", encoding="utf-8") as fh:
         for c in all_chunks:
@@ -283,11 +314,17 @@ def main() -> None:
         encoding="utf-8",
     )
 
-    sizes = [c["chars"] for c in all_chunks]
-    print(
-        f"\n合计 {len(all_chunks)} 块 | 平均 {sum(sizes) // len(sizes)} 字 | "
-        f"最大 {max(sizes)} 字 | 表格块 {sum(1 for c in all_chunks if c['kind'] == 'table')}"
-    )
+    if verbose:
+        sizes = [c["chars"] for c in all_chunks]
+        print(
+            f"\n合计 {len(all_chunks)} 块 | 平均 {sum(sizes) // len(sizes)} 字 | "
+            f"最大 {max(sizes)} 字 | 表格块 {sum(1 for c in all_chunks if c['kind'] == 'table')}"
+        )
+    return all_chunks, dropped_all
+
+
+def main() -> None:
+    build_all()
 
 
 if __name__ == "__main__":

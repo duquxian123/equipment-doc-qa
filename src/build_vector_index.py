@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import json
+import os
 import time
 from pathlib import Path
 
@@ -23,8 +24,15 @@ CACHE = ROOT / ".cache" / "fastembed"
 MODEL = "BAAI/bge-small-zh-v1.5"
 
 
-def main() -> None:
+def build_index() -> dict:
+    """重建全部向量，写入临时文件后原子替换，避免读到半成品。"""
+    if not CHUNKS.exists():
+        raise FileNotFoundError(f"缺少知识块文件：{CHUNKS}")
+
     docs = [json.loads(line) for line in CHUNKS.open(encoding="utf-8")]
+    if not docs:
+        raise ValueError("知识块文件为空，无法建立索引")
+
     print(f"载入 {len(docs)} 个块，模型 {MODEL}")
 
     model = TextEmbedding(model_name=MODEL, cache_dir=str(CACHE))
@@ -35,23 +43,33 @@ def main() -> None:
     vectors /= np.linalg.norm(vectors, axis=1, keepdims=True)
 
     OUT.mkdir(parents=True, exist_ok=True)
-    np.save(OUT / "vectors.npy", vectors)
-    (OUT / "index_meta.json").write_text(
-        json.dumps(
-            {
-                "model": MODEL,
-                "count": len(docs),
-                "dim": int(vectors.shape[1]),
-                "ids": [d["id"] for d in docs],
-            },
-            ensure_ascii=False,
-            indent=2,
-        ),
-        encoding="utf-8",
-    )
+    vector_tmp = OUT / "vectors.npy.tmp"
+    meta_tmp = OUT / "index_meta.json.tmp"
+    with vector_tmp.open("wb") as fh:
+        np.save(fh, vectors)
+    meta = {
+        "model": MODEL,
+        "count": len(docs),
+        "dim": int(vectors.shape[1]),
+        "ids": [d["id"] for d in docs],
+    }
+    meta_tmp.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    # 先保存元信息再切换向量，最后写入的 vectors.npy 作为就绪标志。
+    os.replace(meta_tmp, OUT / "index_meta.json")
+    vector_tmp.replace(OUT / "vectors.npy")
 
     print(f"完成：{vectors.shape[0]} 块 × {vectors.shape[1]} 维，耗时 {time.time() - started:.1f}s")
     print(f"落盘：{OUT / 'vectors.npy'}")
+    return {
+        "count": len(docs),
+        "dim": int(vectors.shape[1]),
+        "elapsed_seconds": round(time.time() - started, 1),
+    }
+
+
+def main() -> None:
+    build_index()
 
 
 if __name__ == "__main__":

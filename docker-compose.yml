@@ -1,0 +1,13 @@
+services:
+  equipment-doc-qa:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      HF_HOME: /app/.cache/huggingface
+    volumes:
+      - ./.env:/app/.env:ro
+      - ./corpus:/app/corpus:ro
+      - ./output:/app/output
+      - ./.cache:/app/.cache
+    restart: unless-stopped

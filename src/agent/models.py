@@ -55,4 +55,3 @@ class AgentState(TypedDict, total=False):
     citations: list[dict[str, Any]]
     limitations: list[str]
     unsafe_reason: str
-

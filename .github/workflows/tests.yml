@@ -1,0 +1,62 @@
+name: tests
+
+on:
+  push:
+    branches:
+      - main
+      - portfolio-cleanup
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Cache demo data and embedding model
+        uses: actions/cache@v4
+        with:
+          path: |
+            .cache/fastembed
+            corpus
+            output/chunks
+            output/index
+          key: demo-${{ hashFiles('scripts/prepare_demo.py') }}
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Create test configuration
+        run: |
+          cp .env.example .env
+          sed -i 's/replace-me/ci-placeholder/' .env
+
+      - name: Prepare public demo data
+        run: python scripts/prepare_demo.py
+
+      - name: Check dependencies
+        run: python -m pip check
+
+      - name: Run automated tests
+        env:
+          PYTHONIOENCODING: utf-8
+        run: python -m unittest discover -s tests -v
+
+      - name: Run Agent evaluation
+        env:
+          PYTHONIOENCODING: utf-8
+        run: python src/eval_agent.py

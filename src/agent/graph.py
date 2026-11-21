@@ -217,7 +217,7 @@ class GraphRunner:
             limitations.append("运营数据来自程序生成的模拟沙盘，不是真实企业数据。")
         if has_tool_failure:
             limitations.append("本轮至少有一个工具失败或权限不足，最终结论只能使用成功返回的数据。")
-        limitations.append("当前为本地个人项目演示，不是生产级 Agent 平台。")
+        limitations.append("当前为本地演示版本，不是生产级 Agent 平台。")
         return {
             "answer": answer,
             "status": "refused" if refused else ("failed" if failed else "completed"),
